@@ -16,18 +16,34 @@ st.set_page_config(
 @st.cache_data
 def load_data():
     try:
-        # Try to read the CSV file
-        df_raw = pd.read_csv('../Data/salesmonthly.csv', header=None)
-        if df_raw.shape[1] == 1:
-            import csv
-            with open('../Data/salesmonthly.csv', 'r') as f:
-                reader = csv.reader(f)
-                rows = list(reader)
-            header = rows[0][0].split(',')
-            data = [row[0].split(',') for row in rows[1:]]
-            df = pd.DataFrame(data, columns=header)
-        else:
-            df = pd.read_csv('../Data/salesmonthly.csv')
+        # Try multiple possible paths for the CSV file
+        possible_paths = [
+            'Data/salesmonthly.csv',           # Running from root
+            '../Data/salesmonthly.csv',        # Running from dashboard folder
+            'C:/Users/aarti/Documents/Supply Chain Optimisation ML/Data/salesmonthly.csv'  # Absolute path
+        ]
+        
+        df = None
+        for path in possible_paths:
+            try:
+                # Try to read the CSV file
+                df_raw = pd.read_csv(path, header=None)
+                if df_raw.shape[1] == 1:
+                    import csv
+                    with open(path, 'r') as f:
+                        reader = csv.reader(f)
+                        rows = list(reader)
+                    header = rows[0][0].split(',')
+                    data = [row[0].split(',') for row in rows[1:]]
+                    df = pd.DataFrame(data, columns=header)
+                else:
+                    df = pd.read_csv(path)
+                break  # If successful, break out of the loop
+            except FileNotFoundError:
+                continue  # Try the next path
+        
+        if df is None:
+            raise FileNotFoundError("Could not find salesmonthly.csv in any expected location")
         
         df.columns = df.columns.str.strip().str.replace('"', '').str.replace("'", '').str.lower()
         if 'datum' in df.columns:
