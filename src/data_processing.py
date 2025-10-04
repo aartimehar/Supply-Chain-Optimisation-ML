@@ -9,7 +9,8 @@ def load_sales_data(filepath="../Data/salesweekly.csv"):
     """Load historical pharmaceutical weekly sales data"""
     df = pd.read_csv(filepath)
     df.columns = [c.lower() for c in df.columns]
-    df['date'] = pd.to_datetime(df['date'])
+    df['date'] = pd.to_datetime(df['datum'])
+    df = df.drop(columns=['datum']) # Remove the original 'datum' column
     return df
 
 def load_fda_shortages(filepath="../Data/fda_shortages.csv"):
