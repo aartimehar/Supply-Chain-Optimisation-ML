@@ -13,7 +13,7 @@ This platform solves the common challenge of scattered sales data and manual rep
 - **Limited Insights**: Basic charts that don't reveal actionable business intelligence
 - **Accessibility**: Technical barriers preventing non-technical users from exploring data
 
-ATLAS bridges this gap by providing an intuitive interface where users can upload their CSV sales data and immediately access professional-grade analytics. Whether you're a pharmaceutical company tracking ATC categories, a retail business monitoring product performance, or a SaaS company analyzing subscription revenue, the platform adapts to your data structure and provides relevant insights.
+ATLAS bridges this gap by providing an intuitive interface where users can upload their CSV sales data and immediately access professional-grade analytics. Whether you're a company tracking ATC categories, a retail business monitoring product performance, or a SaaS company analyzing subscription revenue, the platform adapts to your data structure and provides relevant insights.
 
 The dual-mode design lets teams explore demo data to understand capabilities, then seamlessly transition to analyzing their own business data using the same powerful analytics suite.
 
@@ -69,7 +69,7 @@ The codebase demonstrates several modern web development patterns:
 
 **Key Directories:**
 - [`dashboard/`](./dashboard/) - Main application files including the Streamlit dashboard
-- [`Data/`](./Data/) - Sample datasets including pharmaceutical sales data and FDA shortage information
+- [`Data/`](./Data/) - Sample datasets including sales data and FDA shortage information
 - [`notebooks/`](./notebooks/) - Jupyter notebooks for data exploration and analysis
 - [`src/`](./src/) - Core Python modules for data processing and modeling
 - [`reports/`](./reports/) - Generated insights and findings documentation
