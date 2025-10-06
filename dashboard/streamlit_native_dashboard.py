@@ -25,9 +25,117 @@ def create_csv_template():
     }
     return pd.DataFrame(template_data)
 
-# Data loading function
+# Validation function for uploaded CSV
+def validate_uploaded_csv(df):
+    """Validate uploaded CSV format and provide detailed feedback"""
+    issues = []
+    warnings = []
+    
+    # Check for required columns
+    required_cols = ['date']
+    optional_cols = ['product_name', 'category', 'revenue', 'sales_rep', 'quantity']
+    
+    # Check date column
+    date_columns = ['date', 'datum', 'Date', 'DATE']
+    date_col_found = None
+    for col in date_columns:
+        if col in df.columns:
+            date_col_found = col
+            break
+    
+    if not date_col_found:
+        issues.append("❌ Missing date column. Please include a column named 'date', 'Date', or 'datum'")
+    else:
+        # Validate date format
+        try:
+            pd.to_datetime(df[date_col_found].head())
+        except:
+            issues.append("❌ Date format invalid. Use formats like YYYY-MM-DD, MM/DD/YYYY, or DD/MM/YYYY")
+    
+    # Check for at least one numeric column (revenue/sales data)
+    numeric_cols = []
+    for col in df.columns:
+        if col.lower() not in ['date', 'datum', 'product_name', 'category', 'sales_rep']:
+            try:
+                pd.to_numeric(df[col], errors='coerce')
+                numeric_cols.append(col)
+            except:
+                continue
+    
+    if len(numeric_cols) == 0:
+        issues.append("❌ No numeric sales data found. Please include at least one column with revenue/sales numbers")
+    
+    # Check data quality
+    if len(df) < 2:
+        issues.append("❌ Insufficient data. Please provide at least 2 rows of data")
+    
+    # Warnings for optional improvements
+    if 'product_name' not in df.columns:
+        warnings.append("⚠️ No 'product_name' column found. Product analysis will be limited")
+    
+    if 'revenue' not in df.columns and len(numeric_cols) > 0:
+        warnings.append(f"⚠️ No 'revenue' column found. Using '{numeric_cols[0]}' as primary sales metric")
+    
+    return issues, warnings, numeric_cols
+
+# Process uploaded CSV file
+def process_uploaded_csv(uploaded_file):
+    """Process and clean uploaded CSV data"""
+    try:
+        # Read the uploaded file
+        df = pd.read_csv(uploaded_file)
+        
+        # Validate the data
+        issues, warnings, numeric_cols = validate_uploaded_csv(df)
+        
+        # Show validation results
+        if issues:
+            st.error("🚫 **Data Validation Failed:**")
+            for issue in issues:
+                st.write(issue)
+            st.info("💡 **Please download the template below and follow the format guidelines.**")
+            return None, None
+        
+        if warnings:
+            st.warning("⚠️ **Data Quality Notices:**")
+            for warning in warnings:
+                st.write(warning)
+        
+        # Clean and standardize column names
+        df.columns = df.columns.str.strip().str.lower().str.replace(' ', '_')
+        
+        # Handle date column
+        date_columns = ['date', 'datum']
+        for date_col in date_columns:
+            if date_col in df.columns:
+                df['date'] = pd.to_datetime(df[date_col], errors='coerce')
+                if date_col != 'date':
+                    df = df.drop(columns=[date_col])
+                break
+        
+        # Remove rows with invalid dates
+        df = df.dropna(subset=['date'])
+        
+        # Convert numeric columns
+        for col in df.columns:
+            if col != 'date' and col not in ['product_name', 'category', 'sales_rep']:
+                df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        # Sort by date
+        df = df.sort_values('date').reset_index(drop=True)
+        
+        st.success(f"✅ **Data uploaded successfully!** {len(df)} records processed.")
+        return df, "uploaded"
+        
+    except Exception as e:
+        st.error(f"❌ **Error processing file:** {str(e)}")
+        st.info("💡 **Please ensure your file is a valid CSV format and follows the template structure.**")
+        return None, None
+
+# Enhanced data loading function
 @st.cache_data
-def load_data():
+def load_default_data():
+    """Load the default pharmaceutical sales data"""
     try:
         possible_paths = [
             'Data/salesmonthly.csv',
@@ -54,50 +162,255 @@ def load_data():
                 continue
         
         if df is None:
-            dates = pd.date_range('2020-01-01', periods=48, freq='M')
-            dummy_data = {
+            # Create sample pharmaceutical data if file not found
+            dates = pd.date_range('2014-01-01', periods=60, freq='M')
+            df = pd.DataFrame({
                 'date': dates,
-                'product_a': np.random.randint(500, 2000, 48),
-                'product_b': np.random.randint(300, 1500, 48),
-                'product_c': np.random.randint(400, 1800, 48),
-                'product_d': np.random.randint(200, 1200, 48)
-            }
-            df = pd.DataFrame(dummy_data)
+                'm01ab': np.random.randint(800, 1500, 60),  # Anti-inflammatory
+                'm01ae': np.random.randint(600, 1200, 60),  # Pain relievers
+                'n02ba': np.random.randint(400, 900, 60),   # Analgesics
+                'n02be': np.random.randint(300, 700, 60),   # Painkillers
+                'n05b': np.random.randint(200, 500, 60),    # Anxiolytics
+                'n05c': np.random.randint(250, 600, 60),    # Hypnotics
+                'r03': np.random.randint(350, 800, 60),     # Respiratory
+                'r06': np.random.randint(150, 400, 60)      # Antihistamines
+            })
         else:
+            # Clean the loaded data
             df.columns = df.columns.str.strip().str.replace('"', '').str.replace("'", '').str.lower()
             if 'datum' in df.columns:
                 df = df.rename(columns={'datum': 'date'})
             df['date'] = pd.to_datetime(df['date'])
+            
+            # Convert numeric columns
             numeric_cols = [col for col in df.columns if col != 'date']
             for col in numeric_cols:
                 df[col] = pd.to_numeric(df[col], errors='coerce')
         
-        return df
+        return df, "default"
     except Exception as e:
-        st.error(f"Error loading data: {str(e)}")
-        return None
+        st.error(f"Error loading default data: {str(e)}")
+        return None, None
 
 # Main dashboard
 st.title("⚡ ATLAS Sales Intelligence Platform")
 st.markdown("**Professional Analytics • Universal Application • Instant Insights**")
 
-# Load data
-df = load_data()
+# Hero section with data source options
+st.markdown("---")
+col1, col2 = st.columns([2, 1])
+
+with col1:
+    st.markdown("### 🚀 Welcome to ATLAS Sales Intelligence")
+    st.markdown("""
+    **Transform your sales data into actionable insights in seconds!**
+    
+    Choose how you'd like to explore sales analytics:
+    
+    🏥 **View Demo Data** - Explore our pharmaceutical sales dataset (2014-2018)  
+    📤 **Upload Your Data** - Analyze your own sales data using our template
+    """)
+
+with col2:
+    st.markdown("### 📊 Quick Stats")
+    
+# Data source selection
+st.markdown("---")
+data_source_option = st.radio(
+    "**🎯 Choose Your Data Source:**",
+    options=["📊 Explore Demo Data (Pharmaceutical Sales)", "📤 Upload My Sales Data"],
+    index=0,
+    help="Select whether to view the demo pharmaceutical data or upload your own sales data"
+)
+
+# Initialize variables
+df = None
+data_type = None
+uploaded_file = None
+
+# Handle data source selection
+if data_source_option == "📤 Upload My Sales Data":
+    st.markdown("### 📤 Upload Your Sales Data")
+    
+    # Create two columns for upload interface
+    upload_col1, upload_col2 = st.columns([1, 1])
+    
+    with upload_col1:
+        st.markdown("#### 📋 CSV Template & Guidelines")
+        
+        # Template download
+        template_df = create_csv_template()
+        csv_template = template_df.to_csv(index=False)
+        
+        st.download_button(
+            label="📥 Download CSV Template",
+            data=csv_template,
+            file_name="ATLAS_sales_template.csv",
+            mime="text/csv",
+            help="Download this template and fill it with your sales data"
+        )
+        
+        # Template preview
+        st.markdown("**Template Preview:**")
+        st.dataframe(template_df, use_container_width=True)
+        
+        # Guidelines
+        st.markdown("""
+        **📝 Template Guidelines:**
+        
+        **Required:**
+        - `date` - Sales date (YYYY-MM-DD format)
+        - At least one numeric column (revenue/sales)
+        
+        **Optional but Recommended:**
+        - `product_name` - Product or service name
+        - `category` - Product category
+        - `revenue` - Sales amount in numbers
+        - `sales_rep` - Sales representative name
+        - `quantity` - Units sold
+        
+        **💡 Tips:**
+        - Use consistent date formats
+        - Include product names for better insights
+        - Numeric columns should contain only numbers
+        - UTF-8 encoding recommended
+        """)
+    
+    with upload_col2:
+        st.markdown("#### 📁 Upload Your File")
+        
+        uploaded_file = st.file_uploader(
+            "Choose your CSV file",
+            type=['csv'],
+            help="Upload a CSV file following the template format",
+            key="sales_data_upload"
+        )
+        
+        if uploaded_file is not None:
+            st.info(f"📄 **File:** {uploaded_file.name}")
+            st.info(f"📏 **Size:** {uploaded_file.size:,} bytes")
+            
+            # Process the uploaded file
+            with st.spinner("🔄 Processing your data..."):
+                df, data_type = process_uploaded_csv(uploaded_file)
+            
+            if df is not None:
+                # Show upload success info
+                st.markdown("#### ✅ Upload Successful!")
+                
+                # Quick preview
+                preview_col1, preview_col2, preview_col3 = st.columns(3)
+                preview_col1.metric("📊 Records", len(df))
+                preview_col2.metric("📅 Date Range", f"{(df['date'].max() - df['date'].min()).days} days")
+                preview_col3.metric("📈 Data Columns", len([col for col in df.columns if col != 'date']))
+                
+                # Data preview
+                with st.expander("👀 Preview Your Data"):
+                    st.dataframe(df.head(10), use_container_width=True)
+                    
+                    # Data summary
+                    st.markdown("**📋 Data Summary:**")
+                    st.write(f"• **Date Range:** {df['date'].min().strftime('%B %Y')} to {df['date'].max().strftime('%B %Y')}")
+                    numeric_cols = [col for col in df.columns if col != 'date' and df[col].dtype in ['int64', 'float64']]
+                    st.write(f"• **Sales Columns:** {', '.join([col.replace('_', ' ').title() for col in numeric_cols])}")
+                    if len(df) > 0:
+                        total_revenue = df[numeric_cols].sum().sum() if numeric_cols else 0
+                        st.write(f"• **Total Revenue:** ${total_revenue:,.2f}")
+        else:
+            st.markdown("""
+            ⬆️ **Ready to upload?**
+            
+            1. 📥 Download the template above
+            2. 📝 Fill it with your sales data  
+            3. 📤 Upload your completed CSV here
+            4. 📊 Instantly see your analytics!
+            
+            **🔒 Privacy:** Your data stays secure and is never stored permanently.
+            """)
+
+else:
+    # Load demo data
+    st.markdown("### 📊 Exploring Demo Data - Pharmaceutical Sales Dataset")
+    
+    with st.spinner("📊 Loading pharmaceutical sales data..."):
+        df, data_type = load_default_data()
+    
+    if df is not None:
+        # Show demo data info
+        st.success("✅ **Demo data loaded successfully!**")
+        
+        info_col1, info_col2, info_col3, info_col4 = st.columns(4)
+        info_col1.metric("🏥 Industry", "Pharmaceutical")
+        info_col2.metric("📊 Records", len(df))
+        info_col3.metric("🏷️ Product Categories", len([col for col in df.columns if col != 'date']))
+        info_col4.metric("📅 Time Period", "2014-2018")
+        
+        st.markdown("""
+        **📋 Demo Dataset Information:**
+        - **Industry:** Pharmaceutical & Healthcare
+        - **Products:** 8 therapeutic categories (M01AB, M01AE, N02BA, etc.)
+        - **Time Range:** January 2014 to December 2018 (60 months)
+        - **Data Type:** Monthly sales figures across different drug categories
+        - **Use Case:** Perfect for exploring dashboard capabilities with real-world patterns
+        """)
+        
+        # Demo data preview
+        with st.expander("👀 Preview Demo Data"):
+            st.dataframe(df.head(10), use_container_width=True)
+            
+            # Category descriptions
+            st.markdown("**🏷️ Product Categories:**")
+            category_descriptions = {
+                'm01ab': 'Anti-inflammatory drugs (NSAIDs)',
+                'm01ae': 'Pain relievers & analgesics', 
+                'n02ba': 'Salicylic acid derivatives',
+                'n02be': 'Pyrazolone derivatives',
+                'n05b': 'Anxiolytics (anti-anxiety)',
+                'n05c': 'Hypnotics & sedatives',
+                'r03': 'Respiratory system drugs',
+                'r06': 'Antihistamines'
+            }
+            
+            cols = st.columns(2)
+            for i, (code, desc) in enumerate(category_descriptions.items()):
+                with cols[i % 2]:
+                    if code in df.columns:
+                        st.write(f"• **{code.upper()}:** {desc}")
+
+# Load data based on selection
+if df is None:
+    st.warning("⚠️ Please select a data source above to begin analysis.")
+    st.stop()
 
 if df is not None:
     # Sidebar
     st.sidebar.title("⚡ ATLAS Analytics")
     st.sidebar.markdown("*Carry Your Business Data with Confidence*")
     
-    # Template download
+    # Data source indicator
+    if data_type == "uploaded":
+        st.sidebar.success("📤 **Your Data Active**")
+        st.sidebar.write(f"🗂️ **File:** {uploaded_file.name if uploaded_file else 'Custom Data'}")
+    else:
+        st.sidebar.info("📊 **Demo Data Active**")
+        st.sidebar.write("🏥 **Dataset:** Pharmaceutical Sales")
+    
+    # Quick template download (always available)
+    st.sidebar.markdown("---")
+    st.sidebar.subheader("📋 Resources")
     template_df = create_csv_template()
     csv_template = template_df.to_csv(index=False)
     st.sidebar.download_button(
         label="📥 Download CSV Template",
         data=csv_template,
-        file_name="sales_data_template.csv",
-        mime="text/csv"
+        file_name="ATLAS_sales_template.csv",
+        mime="text/csv",
+        help="Download template for uploading your own data"
     )
+    
+    # Switch data source button
+    if st.sidebar.button("🔄 Switch Data Source", help="Change between demo data and file upload"):
+        st.rerun()
     
     # Navigation
     st.sidebar.markdown("---")
@@ -129,13 +442,22 @@ if df is not None:
         help="Filter data by date range"
     )
     
-    # Product Selection Filter
+    # Product Selection Filter - adapted for both data types
     product_cols = [col for col in df.columns if col != 'date']
+    
+    # Customize labels based on data type
+    if data_type == "uploaded":
+        product_label = "🏷️ Select Products/Categories"
+        help_text = "Choose which data columns to analyze"
+    else:
+        product_label = "🏥 Select ATC Categories"
+        help_text = "Choose pharmaceutical categories to analyze"
+    
     selected_products = st.sidebar.multiselect(
-        "🏷️ Select Products",
+        product_label,
         options=product_cols,
         default=product_cols,
-        help="Choose which products to include in analysis"
+        help=help_text
     )
     
     # Revenue Range Filter
