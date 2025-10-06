@@ -135,7 +135,7 @@ def process_uploaded_csv(uploaded_file):
 # Enhanced data loading function
 @st.cache_data
 def load_default_data():
-    """Load the default pharmaceutical sales data"""
+    """Load the default Universal sales data"""
     try:
         possible_paths = [
             'Data/salesmonthly.csv',
@@ -162,7 +162,7 @@ def load_default_data():
                 continue
         
         if df is None:
-            # Create sample pharmaceutical data if file not found
+            # Create sample Universal data if file not found
             dates = pd.date_range('2014-01-01', periods=60, freq='M')
             df = pd.DataFrame({
                 'date': dates,
@@ -207,7 +207,7 @@ with col1:
     
     Choose how you'd like to explore sales analytics:
     
-    🏥 **View Demo Data** - Explore our pharmaceutical sales dataset (2014-2018)  
+    🏥 **View Demo Data** - Explore our Universal sales dataset (2014-2018)  
     📤 **Upload Your Data** - Analyze your own sales data using our template
     """)
 
@@ -218,9 +218,9 @@ with col2:
 st.markdown("---")
 data_source_option = st.radio(
     "**🎯 Choose Your Data Source:**",
-    options=["📊 Explore Demo Data (Pharmaceutical Sales)", "📤 Upload My Sales Data"],
+    options=["📊 Explore Demo Data (Universal Sales)", "📤 Upload My Sales Data"],
     index=0,
-    help="Select whether to view the demo pharmaceutical data or upload your own sales data"
+    help="Select whether to view the demo Universal data or upload your own sales data"
 )
 
 # Initialize variables
@@ -252,7 +252,7 @@ if data_source_option == "📤 Upload My Sales Data":
         
         # Template preview
         st.markdown("**Template Preview:**")
-        st.dataframe(template_df, use_container_width=True)
+        st.dataframe(template_df, width='stretch')
         
         # Guidelines
         st.markdown("""
@@ -306,7 +306,7 @@ if data_source_option == "📤 Upload My Sales Data":
                 
                 # Data preview
                 with st.expander("👀 Preview Your Data"):
-                    st.dataframe(df.head(10), use_container_width=True)
+                    st.dataframe(df.head(10), width='stretch')
                     
                     # Data summary
                     st.markdown("**📋 Data Summary:**")
@@ -330,9 +330,9 @@ if data_source_option == "📤 Upload My Sales Data":
 
 else:
     # Load demo data
-    st.markdown("### 📊 Exploring Demo Data - Pharmaceutical Sales Dataset")
+    st.markdown("### 📊 Exploring Demo Data - Universal Sales Dataset")
     
-    with st.spinner("📊 Loading pharmaceutical sales data..."):
+    with st.spinner("📊 Loading Universal sales data..."):
         df, data_type = load_default_data()
     
     if df is not None:
@@ -340,14 +340,14 @@ else:
         st.success("✅ **Demo data loaded successfully!**")
         
         info_col1, info_col2, info_col3, info_col4 = st.columns(4)
-        info_col1.metric("🏥 Industry", "Pharmaceutical")
+        info_col1.metric("🏥 Industry", "Universal")
         info_col2.metric("📊 Records", len(df))
         info_col3.metric("🏷️ Product Categories", len([col for col in df.columns if col != 'date']))
         info_col4.metric("📅 Time Period", "2014-2018")
         
         st.markdown("""
         **📋 Demo Dataset Information:**
-        - **Industry:** Pharmaceutical & Healthcare
+        - **Industry:** Universal  & Healthcare
         - **Products:** 8 therapeutic categories (M01AB, M01AE, N02BA, etc.)
         - **Time Range:** January 2014 to December 2018 (60 months)
         - **Data Type:** Monthly sales figures across different drug categories
@@ -356,7 +356,7 @@ else:
         
         # Demo data preview
         with st.expander("👀 Preview Demo Data"):
-            st.dataframe(df.head(10), use_container_width=True)
+            st.dataframe(df.head(10), width='stretch')
             
             # Category descriptions
             st.markdown("**🏷️ Product Categories:**")
@@ -393,7 +393,7 @@ if df is not None:
         st.sidebar.write(f"🗂️ **File:** {uploaded_file.name if uploaded_file else 'Custom Data'}")
     else:
         st.sidebar.info("📊 **Demo Data Active**")
-        st.sidebar.write("🏥 **Dataset:** Pharmaceutical Sales")
+        st.sidebar.write("🏥 **Dataset:** Universal Sales")
     
     # Quick template download (always available)
     st.sidebar.markdown("---")
@@ -451,7 +451,7 @@ if df is not None:
         help_text = "Choose which data columns to analyze"
     else:
         product_label = "🏥 Select ATC Categories"
-        help_text = "Choose pharmaceutical categories to analyze"
+        help_text = "Choose Universal categories to analyze"
     
     selected_products = st.sidebar.multiselect(
         product_label,
@@ -462,9 +462,15 @@ if df is not None:
     
     # Revenue Range Filter
     if len(selected_products) > 0:
-        total_revenue_range = df[selected_products].sum(axis=1)
-        min_revenue = int(total_revenue_range.min())
-        max_revenue = int(total_revenue_range.max())
+        # Ensure only numeric columns are used for revenue calculation
+        numeric_products = [col for col in selected_products if pd.api.types.is_numeric_dtype(df[col])]
+        if numeric_products:
+            total_revenue_range = df[numeric_products].sum(axis=1)
+            min_revenue = int(total_revenue_range.min())
+            max_revenue = int(total_revenue_range.max())
+        else:
+            min_revenue = 0
+            max_revenue = 1000000
         
         revenue_filter = st.sidebar.slider(
             "💰 Revenue Range Filter",
@@ -539,9 +545,12 @@ if df is not None:
     
     # Apply revenue filter
     if len(selected_products) > 0:
-        period_revenues = filtered_df[selected_products].sum(axis=1)
-        revenue_mask = (period_revenues >= revenue_filter[0]) & (period_revenues <= revenue_filter[1])
-        filtered_df = filtered_df[revenue_mask]
+        # Only apply revenue filter to numeric columns
+        numeric_products = [col for col in selected_products if pd.api.types.is_numeric_dtype(filtered_df[col])]
+        if numeric_products:
+            period_revenues = filtered_df[numeric_products].sum(axis=1)
+            revenue_mask = (period_revenues >= revenue_filter[0]) & (period_revenues <= revenue_filter[1])
+            filtered_df = filtered_df[revenue_mask]
     
     # Show filter summary
     st.sidebar.markdown("---")
