@@ -348,7 +348,7 @@ else:
         st.markdown("""
         **📋 Demo Dataset Information:**
         - **Industry:** Universal  & Healthcare
-        - **Products:** 8 therapeutic categories (M01AB, M01AE, N02BA, etc.)
+        - **Products:** 8 Product categories (M01AB, M01AE, N02BA, etc.)
         - **Time Range:** January 2014 to December 2018 (60 months)
         - **Data Type:** Monthly sales figures across different drug categories
         - **Use Case:** Perfect for exploring dashboard capabilities with real-world patterns
