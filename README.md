@@ -1,5 +1,7 @@
 # ATLAS Sales Intelligence Platform
 
+🚀 **[Live Demo](https://aartimehar-supply-ch-dashboardstreamlit-native-dashboard-lf6aqg.streamlit.app/)**
+
 A modern web application for sales data analysis and business intelligence. Built with Streamlit, this platform provides comprehensive analytics dashboards for sales teams and business analysts.
 
 ## Use Case
