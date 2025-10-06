@@ -5,6 +5,81 @@ from datetime import datetime, timedelta
 import warnings
 warnings.filterwarnings('ignore')
 
+# Template and validation functions
+def create_csv_template():
+    """Generate a CSV template for users to follow"""
+    template_data = {
+        'date': ['2024-01-31', '2024-02-28', '2024-03-31', '2024-04-30', '2024-05-31'],
+        'product_a': [1000, 1200, 1100, 1300, 1150],
+        'product_b': [800, 900, 850, 950, 875],
+        'product_c': [600, 700, 650, 750, 680],
+        'product_d': [400, 500, 450, 550, 475]
+    }
+    return pd.DataFrame(template_data)
+
+def validate_uploaded_data(df):
+    """Validate uploaded CSV format"""
+    issues = []
+    
+    # Check for date column
+    date_columns = ['date', 'datum', 'Date', 'DATE']
+    if not any(col in df.columns for col in date_columns):
+        issues.append("❌ Missing date column (expected: 'date')")
+    
+    # Check for at least 2 product columns
+    non_date_cols = [col for col in df.columns if col.lower() not in ['date', 'datum']]
+    if len(non_date_cols) < 2:
+        issues.append("❌ Need at least 2 product columns")
+    
+    # Check data types
+    try:
+        df_test = df.copy()
+        for date_col in date_columns:
+            if date_col in df_test.columns:
+                pd.to_datetime(df_test[date_col])
+                break
+    except:
+        issues.append("❌ Date column format invalid (use YYYY-MM-DD)")
+    
+    return issues
+
+def process_uploaded_data(uploaded_file):
+    """Process and clean uploaded CSV data"""
+    try:
+        df = pd.read_csv(uploaded_file)
+        
+        # Validate format
+        validation_issues = validate_uploaded_data(df)
+        if validation_issues:
+            st.error("📋 Data validation failed:")
+            for issue in validation_issues:
+                st.write(issue)
+            st.info("💡 Please download the template and follow the format.")
+            return None
+        
+        # Clean and standardize
+        df.columns = df.columns.str.strip().str.lower()
+        
+        # Handle date column
+        date_columns = ['date', 'datum']
+        for date_col in date_columns:
+            if date_col in df.columns:
+                df['date'] = pd.to_datetime(df[date_col])
+                if date_col != 'date':
+                    df = df.drop(columns=[date_col])
+                break
+        
+        # Convert numeric columns
+        numeric_cols = [col for col in df.columns if col != 'date']
+        for col in numeric_cols:
+            df[col] = pd.to_numeric(df[col], errors='coerce')
+        
+        return df
+        
+    except Exception as e:
+        st.error(f"Error processing file: {str(e)}")
+        return None
+
 # Page configuration
 st.set_page_config(
     page_title="Advanced Sales Dashboard", 
@@ -14,7 +89,16 @@ st.set_page_config(
 
 # Load and process data
 @st.cache_data
-def load_data():
+def load_data(data_source="default", uploaded_file=None):
+    # Handle uploaded data first
+    if data_source == "uploaded" and uploaded_file is not None:
+        df = process_uploaded_data(uploaded_file)
+        if df is not None:
+            return df, "uploaded"
+        else:
+            st.warning("⚠️ Failed to load uploaded data. Using default data instead.")
+    
+    # Default data loading (your pharmaceutical data)
     try:
         # Try multiple possible paths for the CSV file
         possible_paths = [
@@ -56,7 +140,7 @@ def load_data():
         for col in numeric_cols:
             df[col] = pd.to_numeric(df[col], errors='coerce')
         
-        return df
+        return df, "default"
     except Exception as e:
         st.warning(f"Could not load data file: {str(e)}. Using sample data.")
         # Return sample data
@@ -68,12 +152,86 @@ def load_data():
             'product_c': np.random.randint(400, 1800, 48),
             'product_d': np.random.randint(200, 1200, 48)
         }
-        return pd.DataFrame(dummy_data)
+        return pd.DataFrame(dummy_data), "sample"
 
-df = load_data()
-
-# Sidebar - Navigation and Filters
+# Sidebar - Data Source Selection
 st.sidebar.title("🎯 Sales Dashboard Navigation")
+
+# Add data source options
+st.sidebar.markdown("---")
+st.sidebar.subheader("📊 Data Source")
+
+# Template download
+template_df = create_csv_template()
+csv_template = template_df.to_csv(index=False)
+st.sidebar.download_button(
+    label="📥 Download CSV Template",
+    data=csv_template,
+    file_name="sales_data_template.csv",
+    mime="text/csv",
+    help="Download template and fill with your sales data"
+)
+
+# File upload
+uploaded_file = st.sidebar.file_uploader(
+    "Upload Your Sales Data (Optional)",
+    type=['csv'],
+    help="Upload CSV following the template format"
+)
+
+# Data source selection
+if uploaded_file is not None:
+    data_source = "uploaded"
+    st.sidebar.success("✅ Custom data uploaded!")
+    st.sidebar.write(f"**File:** {uploaded_file.name}")
+else:
+    data_source = "default"
+    st.sidebar.info("📈 Showing pharmaceutical sales data")
+
+# Load data based on source
+df, data_type = load_data(data_source, uploaded_file)
+# Show data preview and instructions
+if data_type == "uploaded":
+    # Show uploaded data preview
+    st.subheader("📊 Your Data Preview")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Data Points", len(df))
+    col2.metric("Products", len([col for col in df.columns if col != 'date']))
+    col3.metric("Date Range", f"{(df['date'].max() - df['date'].min()).days} days")
+    
+    with st.expander("🔍 View Raw Data"):
+        st.dataframe(df.head(10))
+
+elif data_type == "default":
+    # Show information about the pharmaceutical data
+    st.subheader("📊 About This Dataset")
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Industry", "Pharmaceutical")
+    col2.metric("Products", "8 Drug Categories")
+    col3.metric("Time Period", "2014-2018")
+    
+    st.markdown("""
+    **Dataset Details:**
+    - **M01AB, M01AE**: Anti-inflammatory drugs
+    - **N02BA, N02BE**: Pain medications  
+    - **N05B, N05C**: Psychiatric medications
+    - **R03, R06**: Respiratory drugs
+    """)
+
+else:
+    # Show template information for sample data
+    st.subheader("📋 CSV Template Format")
+    st.markdown("**Expected format for your sales data:**")
+    st.dataframe(create_csv_template())
+    
+    st.markdown("""
+    **Instructions:**
+    1. Download the template above
+    2. Replace sample data with your sales figures
+    3. Keep the date format: YYYY-MM-DD
+    4. Upload your completed CSV file
+    """)
+
 dashboard_section = st.sidebar.selectbox(
     "Select Dashboard Section",
     ["Executive Summary", "Sales Performance", "Product Analysis", "Trend Analysis", "Pipeline Management", "Team Performance"]
@@ -110,6 +268,14 @@ else:
 # Main Dashboard Header
 st.title("🚀 Advanced Sales Dashboard")
 st.markdown("**Comprehensive Sales Performance & Analytics Platform**")
+
+# Data source indicator
+if data_type == "uploaded":
+    st.info("📊 **Analyzing Your Custom Data** - Upload successful! Showing insights from your sales data.")
+elif data_type == "default":
+    st.success("📈 **Analyzing Pharmaceutical Sales Data** - Showing insights from our sample dataset. Upload your own data to see personalized analysis.")
+else:
+    st.warning("📊 **Using Sample Data** - Demo dataset loaded. Upload your own CSV file for personalized analysis.")
 
 # I. EXECUTIVE SUMMARY SECTION
 if dashboard_section == "Executive Summary":
