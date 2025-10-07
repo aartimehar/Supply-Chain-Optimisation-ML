@@ -19,7 +19,7 @@ The dual-mode design lets teams explore demo data to understand capabilities, th
 
 ## Features
 
-- **Dual Data Sources**: Analyze demo pharmaceutical data or upload custom CSV files
+- **Dual Data Sources**: Analyze demo data or upload custom CSV files
 - **Real-time Analytics**: Interactive dashboards with filtering and drill-down capabilities  
 - **CSV Template System**: Guided data upload with validation and error handling
 - **Multi-currency Support**: Display data in USD, EUR, or GBP
